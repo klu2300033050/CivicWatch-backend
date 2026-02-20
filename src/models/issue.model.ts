@@ -33,7 +33,6 @@ const IssueSchema = new Schema<IIssue & Document>(
     },
     title: {
       type: String,
-      unique: true,
       required: true,
       maxlength: 100,
       minlength: 5,
@@ -65,5 +64,5 @@ const IssueSchema = new Schema<IIssue & Document>(
 
 export const LocationModel = model("Location", locationSchema);
 
-export interface IssueDocument extends IIssue, Document {}
+export interface IssueDocument extends IIssue, Document { }
 export const IssueModel = model<IssueDocument>("Issue", IssueSchema);

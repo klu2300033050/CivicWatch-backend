@@ -43,13 +43,12 @@ export const createIssue = async (
     }
 
     const issue = await IssueModel.create({
-      citizenId: (req as any).citizenId, // Adapt as per your auth
+      citizenId: (req as any).citizenId, // Fix: match authMiddleware
       issueType,
       title,
       description,
       location: parsedLocation,
       status: "Reported",
-      multimediaId: (req as any).multimediaId,
     });
 
     const mediaDocs = await Promise.all(
@@ -60,15 +59,17 @@ export const createIssue = async (
         return MultimediaModel.create({
           issueID: issue._id,
           fileType: file.mimetype.startsWith("video") ? "video" : "image",
-          url: dataUrl, // Store Base64 string directly in Mongoose
+          url: dataUrl,
           filename: file.originalname,
         });
       })
     );
-    console.log("Response body:", {
-      message: "Issue created",
-      media: mediaDocs,
-    });
+
+    // Link the first media to the issue for convenience
+    if (mediaDocs.length > 0) {
+      issue.media = mediaDocs[0]._id as any;
+      await issue.save();
+    }
 
     res.status(200).json({ message: "Issue created", issue, media: mediaDocs });
   } catch (error) {
@@ -81,24 +82,22 @@ export const getIssues = async (req: Request, res: Response) => {
   try {
     const issues = await IssueModel.find({})
       .populate("citizenId", "fullName")
+      .populate("media") // Populate to get the image URL
       .lean();
 
-    const issuesWithMedia = await Promise.all(
-      issues.map(async (issue) => {
-        const media = await MultimediaModel.find({ issueID: issue._id });
-        return {
-          _id: issue._id,
-          title: issue.title,
-          description: issue.description,
-          type: issue.issueType,
-          location: issue.location, //  send only address
-          reportedBy: (issue.citizenId as any)?.fullName || "Anonymous",
-          reportedAt: issue.createdAt,
-          image: media.length > 0 ? media[0].url : null,
-          status: issue.status,
-        };
-      })
-    );
+    const issuesWithMedia = issues.map((issue) => {
+      return {
+        _id: issue._id,
+        title: issue.title,
+        description: issue.description,
+        type: issue.issueType,
+        location: issue.location,
+        reportedBy: (issue.citizenId as any)?.fullName || "Anonymous",
+        reportedAt: (issue as any).createdAt,
+        image: (issue as any).media?.url || null, // This is the Base64 string
+        status: issue.status,
+      };
+    });
 
     res.json({ issues: issuesWithMedia });
   } catch (err) {
