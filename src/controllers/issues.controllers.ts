@@ -57,7 +57,7 @@ export const createIssue = async (
         MultimediaModel.create({
           issueID: issue._id,
           fileType: file.mimetype.startsWith("video") ? "video" : "image",
-          url: `/uploads/${file.filename}`, // served as static file from public/uploads/
+          url: file.path, // Cloudinary URL provided by multer-storage-cloudinary
           filename: file.originalname,
         })
       )
