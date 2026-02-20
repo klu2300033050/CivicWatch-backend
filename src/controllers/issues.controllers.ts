@@ -53,14 +53,17 @@ export const createIssue = async (
     });
 
     const mediaDocs = await Promise.all(
-      files.map((file) =>
-        MultimediaModel.create({
+      files.map((file) => {
+        const base64Data = file.buffer.toString("base64");
+        const dataUrl = `data:${file.mimetype};base64,${base64Data}`;
+
+        return MultimediaModel.create({
           issueID: issue._id,
           fileType: file.mimetype.startsWith("video") ? "video" : "image",
-          url: file.path, // Cloudinary URL provided by multer-storage-cloudinary
+          url: dataUrl, // Store Base64 string directly in Mongoose
           filename: file.originalname,
-        })
-      )
+        });
+      })
     );
     console.log("Response body:", {
       message: "Issue created",
