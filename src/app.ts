@@ -9,7 +9,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN,
+    origin: true, // This automatically allows the domain that is calling the API
     credentials: true,
   })
 );
