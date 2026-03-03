@@ -1,9 +1,13 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { upload } from "../middlerware/upload.middleware";
-import { createIssue, getIssues } from "../controllers/issues.controllers";
+import { createIssue, getIssues, checkDuplicateIssues } from "../controllers/issues.controllers";
 import { authMiddleware } from "../middlerware/auth.middleware";
 
 const router = Router();
+
+// Add Duplicate check route
+router.get("/issues/check-duplicates", authMiddleware, checkDuplicateIssues);
+
 router.post(
   "/citizen/create-issue",
   authMiddleware,
