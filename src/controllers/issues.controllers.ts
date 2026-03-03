@@ -65,12 +65,16 @@ export const createIssue = async (
       }
     }
 
-    const citizenId = (req as any).citizenId;
-    console.log(`Saving issue to DB for citizenId: ${citizenId}`);
+    const citizenId = (req as any).citizenId || (req as any).adminId;
+    if (!citizenId) {
+      res.status(401).json({ message: "Unauthorized. Missing user ID in token request." });
+      return;
+    }
+    console.log(`Saving issue to DB for citizenId/adminId: ${citizenId}`);
 
     const issue = await IssueModel.create({
       citizenId,
-      issueType,
+      issueType, // MUST match the Mongoose strict literal Enum!
       title,
       description,
       location: parsedLocation,
@@ -79,7 +83,7 @@ export const createIssue = async (
     });
 
     console.log("Issue DB Save complete. Granting reputation...");
-    if (citizenId) {
+    if ((req as any).citizenId) {
       await CitizenModel.findByIdAndUpdate(citizenId, { $inc: { reputationPoints: 10 } }).catch(e => console.error("Rep error:", e));
     }
 
@@ -104,7 +108,12 @@ export const createIssue = async (
 
     console.log("Issue created perfectly! Returning 200 payload.");
     res.status(200).json({ message: "Issue created", issue, media: mediaDocs });
-  } catch (error) {
+  } catch (error: any) {
+    if (error && error.name === "ValidationError") {
+      console.warn("Issue Validation Error:", error.message);
+      res.status(400).json({ message: error.message });
+      return;
+    }
     console.error("/// CRITICAL 500 IN CREATE ISSUE ///", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
