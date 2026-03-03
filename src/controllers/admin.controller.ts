@@ -2,6 +2,8 @@ import { AdminModel } from "../models/admin.model";
 import { IssueModel } from "../models/issue.model";
 import { Request, Response } from "express";
 import { IssueStatusHistoryModel } from "../models/issueStatusHistory.model";
+import { NotificationModel } from "../models/notification.model";
+import { io } from "../socket";
 import mongoose from "mongoose";
 
 interface AuthRequest extends Request {
@@ -88,6 +90,14 @@ export const updateIssueStatus = async (
       return;
     }
 
+    const existingIssue = await IssueModel.findById(id);
+    if (!existingIssue) {
+      res.status(404).json({ message: "Issue not found" });
+      return;
+    }
+
+    const previousStatus = existingIssue.status;
+
     const updatedIssue = await IssueModel.findByIdAndUpdate(
       id,
       { status },
@@ -98,15 +108,42 @@ export const updateIssueStatus = async (
       res.status(404).json({ message: "Issue not found" });
       return;
     }
+
+    // Reputation adjustments: Deduct 5 points if newly rejected
+    if (status === "Rejected" && previousStatus !== "Rejected" && updatedIssue.citizenId) {
+      const citizen_model = await import("../models/citizen.model");
+      await citizen_model.CitizenModel.findByIdAndUpdate(updatedIssue.citizenId, {
+        $inc: { reputationPoints: -5 }
+      });
+    }
+    // Refund 5 points if transitioning away from Rejected
+    else if (status !== "Rejected" && previousStatus === "Rejected" && updatedIssue.citizenId) {
+      const citizen_model = await import("../models/citizen.model");
+      await citizen_model.CitizenModel.findByIdAndUpdate(updatedIssue.citizenId, {
+        $inc: { reputationPoints: 5 }
+      });
+    }
     // Creating a record in IssueStatusHistory for this status change
 
     await IssueStatusHistoryModel.create({
       issueID: new mongoose.Types.ObjectId(id),
       status,
       handledBy: new mongoose.Types.ObjectId(adminId!),
-      changedBy: new mongoose.Types.ObjectId(adminId!), // original reporter, optional
-      changedAt: new Date(), // optional if timestamps enabled
+      changedBy: new mongoose.Types.ObjectId(adminId!),
+      changedAt: new Date(),
     });
+
+    // Real-time notification to issue reporter
+    if (updatedIssue.citizenId) {
+      const notification = await NotificationModel.create({
+        recipientId: updatedIssue.citizenId,
+        recipientRole: "citizen",
+        type: "status_update",
+        message: `Your issue "${updatedIssue.title}" status changed to "${status}"`,
+        issueId: updatedIssue._id,
+      });
+      io.to(`user_${updatedIssue.citizenId.toString()}`).emit("notification", notification);
+    }
 
     res.json({ message: "Issue updated successfully", issue: updatedIssue });
   } catch (error) {
@@ -129,53 +166,53 @@ export const getHandledIssuesByAdmin = async (
     }
 
     const historyRecords = await IssueStatusHistoryModel.aggregate([
-  {
-    $match: {
-      handledBy: new mongoose.Types.ObjectId(adminId),
-      status: { $in: ["In Progress", "Resolved","Pending","Rejected"] },
-    },
-  },
-  {
-    $sort: { changedAt: -1 },
-  },
-  {
-    $group: {
-      _id: "$issueID",
-      latestRecord: { $first: "$$ROOT" },
-    },
-  },
-  {
-    $replaceRoot: { newRoot: "$latestRecord" },
-  },
-  {
-    $lookup: {
-      from: "issues",
-      localField: "issueID",
-      foreignField: "_id",
-      as: "issueDetails",
-    },
-  },
-  {
-    $unwind: "$issueDetails",
-  },
-  {
-    $project: {
-      status: 1,
-      handledBy: 1,
-      lastStatus: "$status",
-      lastUpdated: "$changedAt",
-      issueDetails: 1,
-    },
-  },
-]);
-const issues = historyRecords.map((record) => ({
-  ...record.issueDetails,
-  status: record.status,
-  handledBy: record.handledBy,
-  lastStatus: record.lastStatus,
-  lastUpdated: record.lastUpdated,
-  isRejected: record.status === "Rejected",
-}));
+      {
+        $match: {
+          handledBy: new mongoose.Types.ObjectId(adminId),
+          status: { $in: ["In Progress", "Resolved", "Pending", "Rejected"] },
+        },
+      },
+      {
+        $sort: { changedAt: -1 },
+      },
+      {
+        $group: {
+          _id: "$issueID",
+          latestRecord: { $first: "$$ROOT" },
+        },
+      },
+      {
+        $replaceRoot: { newRoot: "$latestRecord" },
+      },
+      {
+        $lookup: {
+          from: "issues",
+          localField: "issueID",
+          foreignField: "_id",
+          as: "issueDetails",
+        },
+      },
+      {
+        $unwind: "$issueDetails",
+      },
+      {
+        $project: {
+          status: 1,
+          handledBy: 1,
+          lastStatus: "$status",
+          lastUpdated: "$changedAt",
+          issueDetails: 1,
+        },
+      },
+    ]);
+    const issues = historyRecords.map((record) => ({
+      ...record.issueDetails,
+      status: record.status,
+      handledBy: record.handledBy,
+      lastStatus: record.lastStatus,
+      lastUpdated: record.lastUpdated,
+      isRejected: record.status === "Rejected",
+    }));
 
 
     res.status(200).json({ success: true, issues });

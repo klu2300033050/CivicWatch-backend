@@ -16,6 +16,10 @@ const CitizenSchema = new Schema(
       type: String,
       required: [true, "User phone number required"],
     },
+    reputationPoints: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );

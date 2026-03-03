@@ -69,6 +69,7 @@ const getIssuesByCitizen = (req, res) => __awaiter(void 0, void 0, void 0, funct
         }
         const issues = yield issue_model_1.IssueModel.find({ citizenId })
             .populate("citizenId", "fullName")
+            .populate("media")
             .sort({ createdAt: -1 })
             .lean();
         res.json({ issues });

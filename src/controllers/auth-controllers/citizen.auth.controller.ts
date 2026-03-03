@@ -84,7 +84,7 @@ export const citizenSignin = async (
         role: "citizen",
       },
       process.env.JWT_PASSWORD!,
-      { expiresIn: "1d" }
+      { expiresIn: "7d" }  // 7-day session
     );
     res.json({
       token,

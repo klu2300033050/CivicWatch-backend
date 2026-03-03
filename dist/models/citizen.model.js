@@ -17,5 +17,9 @@ const CitizenSchema = new mongoose_1.Schema({
         type: String,
         required: [true, "User phone number required"],
     },
+    reputationPoints: {
+        type: Number,
+        default: 0,
+    },
 }, { timestamps: true });
 exports.CitizenModel = (0, mongoose_1.model)("Citizen", CitizenSchema);

@@ -16,44 +16,34 @@ const IssueSchema = new mongoose_1.Schema({
     issueType: {
         type: String,
         enum: [
+            "Roads",
+            "Electricity",
+            "Water",
+            "Garbage",
+            "Public Safety",
             "Road Infrastructure",
             "Waste Management",
             "Environmental Issues",
             "Utilities & Infrastructure",
-            "Public Safety",
             "Other",
         ],
-        default: "Road Infrastructure",
+        default: "Roads",
         required: true,
     },
-    title: {
-        type: String,
-        unique: true,
-        required: true,
-        maxlength: 100,
-        minlength: 5,
-    },
-    description: {
-        type: String,
-        required: true,
-    },
+    title: { type: String, required: true, maxlength: 100, minlength: 5 },
+    description: { type: String, required: true },
     status: {
         type: String,
-        enum: ["Reported", "In Progress", "Resolved", "Rejected", "Pending"],
+        enum: ["Reported", "Pending", "Assigned", "In Progress", "Resolved", "Rejected"],
         default: "Reported",
     },
-    location: {
-        type: locationSchema,
-        required: true,
-    },
-    media: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: "Multimedia",
-    },
-    handledBy: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: "Admin",
-    },
+    location: { type: locationSchema, required: true },
+    media: { type: mongoose_1.Schema.Types.ObjectId, ref: "Multimedia" },
+    handledBy: { type: mongoose_1.Schema.Types.ObjectId, ref: "Admin" },
+    upvotes: [{ type: mongoose_1.Schema.Types.ObjectId, ref: "Citizen" }],
+    isAnonymous: { type: Boolean, default: false },
 }, { timestamps: true });
+IssueSchema.index({ issueType: 1, status: 1 });
+IssueSchema.index({ "location.latitude": 1, "location.longitude": 1 });
 exports.LocationModel = (0, mongoose_1.model)("Location", locationSchema);
 exports.IssueModel = (0, mongoose_1.model)("Issue", IssueSchema);

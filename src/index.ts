@@ -1,17 +1,23 @@
 import dotenv from "dotenv";
+import http from "http";
 import { connectDB } from "./config/database";
 import app from "./app";
+import { initSocket } from "./socket";
 
 dotenv.config({ path: "./.env" });
 
 const PORT = process.env.PORT || 3000;
 
+// Create HTTP server so Socket.io can attach
+const server = http.createServer(app);
+initSocket(server);
+
 // For standalone server (Local development)
 if (process.env.NODE_ENV !== "production") {
   connectDB()
     .then(() => {
-      app.listen(PORT, () => {
-        console.log(`Server is running on port : ${PORT}`);
+      server.listen(PORT, () => {
+        console.log(`🚀 Server is running on port: ${PORT}`);
       });
     })
     .catch((error) => {

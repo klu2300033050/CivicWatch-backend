@@ -5,33 +5,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.upload = void 0;
 const multer_1 = __importDefault(require("multer"));
-const path_1 = __importDefault(require("path"));
-const fs_1 = __importDefault(require("fs"));
-// Ensure uploads directory exists
-const uploadDir = path_1.default.join(process.cwd(), "public", "uploads");
-if (!fs_1.default.existsSync(uploadDir)) {
-    fs_1.default.mkdirSync(uploadDir, { recursive: true });
-}
-// Use local disk storage — no Cloudinary/API key needed
-const storage = multer_1.default.diskStorage({
-    destination: (_req, _file, cb) => {
-        cb(null, uploadDir);
-    },
-    filename: (_req, file, cb) => {
-        const uniqueName = `${Date.now()}-${file.originalname.replace(/\s+/g, "_")}`;
-        cb(null, uniqueName);
-    },
-});
-// Accept only images and videos, max 10MB each
+// Use memory storage to avoid Vercel's read-only filesystem
+// We will store the file data directly in MongoDB/Mongoose
+const storage = multer_1.default.memoryStorage();
 exports.upload = (0, multer_1.default)({
     storage,
-    limits: { fileSize: 10 * 1024 * 1024 },
-    fileFilter: (_req, file, cb) => {
-        if (file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/")) {
-            cb(null, true);
-        }
-        else {
-            cb(new Error("Only image and video files are allowed"));
-        }
-    },
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit to prevent MongoDB size issues
 });

@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_middleware_1 = require("../middlerware/auth.middleware");
+const role_middleware_1 = require("../middlerware/role.middleware");
+const upvote_controller_1 = require("../controllers/upvote.controller");
+const router = (0, express_1.Router)();
+router.get("/issues/trending", auth_middleware_1.authMiddleware, upvote_controller_1.getTrendingIssues);
+router.post("/issues/:id/upvote", auth_middleware_1.authMiddleware, role_middleware_1.citizenOnly, upvote_controller_1.upvoteIssue);
+exports.default = router;

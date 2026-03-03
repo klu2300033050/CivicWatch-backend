@@ -16,6 +16,8 @@ exports.deleteIssueByAdmin = exports.getHandledIssuesByAdmin = exports.updateIss
 const admin_model_1 = require("../models/admin.model");
 const issue_model_1 = require("../models/issue.model");
 const issueStatusHistory_model_1 = require("../models/issueStatusHistory.model");
+const notification_model_1 = require("../models/notification.model");
+const socket_1 = require("../socket");
 const mongoose_1 = __importDefault(require("mongoose"));
 const getAdminProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -85,9 +87,20 @@ const updateIssueStatus = (req, res) => __awaiter(void 0, void 0, void 0, functi
             issueID: new mongoose_1.default.Types.ObjectId(id),
             status,
             handledBy: new mongoose_1.default.Types.ObjectId(adminId),
-            changedBy: new mongoose_1.default.Types.ObjectId(adminId), // original reporter, optional
-            changedAt: new Date(), // optional if timestamps enabled
+            changedBy: new mongoose_1.default.Types.ObjectId(adminId),
+            changedAt: new Date(),
         });
+        // Real-time notification to issue reporter
+        if (updatedIssue.citizenId) {
+            const notification = yield notification_model_1.NotificationModel.create({
+                recipientId: updatedIssue.citizenId,
+                recipientRole: "citizen",
+                type: "status_update",
+                message: `Your issue "${updatedIssue.title}" status changed to "${status}"`,
+                issueId: updatedIssue._id,
+            });
+            socket_1.io.to(`user_${updatedIssue.citizenId.toString()}`).emit("notification", notification);
+        }
         res.json({ message: "Issue updated successfully", issue: updatedIssue });
     }
     catch (error) {

@@ -107,7 +107,7 @@ export const adminSignin = async (
         role: "admin",
       },
       process.env.JWT_PASSWORD!,
-      { expiresIn: "1d" }
+      { expiresIn: "7d" }  // 7-day session
     );
 
     res.json({

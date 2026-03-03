@@ -82,6 +82,7 @@ export const getIssuesByCitizen = async (req: Request, res: Response) => {
 
     const issues = await IssueModel.find({ citizenId })
       .populate("citizenId", "fullName")
+      .populate("media")
       .sort({ createdAt: -1 })
       .lean();
 
