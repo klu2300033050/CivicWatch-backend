@@ -12,8 +12,8 @@ const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 initSocket(server);
 
-// For standalone server (Local development)
-if (process.env.NODE_ENV !== "production") {
+// For regular persistent servers (Local development, Render, etc.)
+if (!process.env.VERCEL) {
   connectDB()
     .then(() => {
       server.listen(PORT, () => {
