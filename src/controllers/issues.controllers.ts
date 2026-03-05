@@ -149,6 +149,7 @@ export const getIssues = async (req: Request, res: Response) => {
       status: issue.status,
       upvotes: issue.upvotes || [],
       isAnonymous: issue.isAnonymous,
+      feedback: (issue as any).feedback ?? null,
     }));
 
     res.json({ issues: issuesWithMedia, total, page, pages: Math.ceil(total / limit) });

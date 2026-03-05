@@ -6,6 +6,12 @@ export interface ILocation {
   address?: string;
 }
 
+export interface IFeedback {
+  rating: number;        // 1-5 stars
+  comment?: string;
+  submittedAt: Date;
+}
+
 export interface IIssue {
   citizenId: Types.ObjectId;
   issueType: string;
@@ -17,6 +23,7 @@ export interface IIssue {
   handledBy?: Types.ObjectId;
   upvotes: Types.ObjectId[];   // array of citizen IDs who upvoted
   isAnonymous: boolean;
+  feedback?: IFeedback;
 }
 
 const locationSchema = new Schema<ILocation>(
@@ -64,6 +71,11 @@ const IssueSchema = new Schema<IIssue & Document>(
     handledBy: { type: Schema.Types.ObjectId, ref: "Admin" },
     upvotes: [{ type: Schema.Types.ObjectId, ref: "Citizen" }],
     isAnonymous: { type: Boolean, default: false },
+    feedback: {
+      rating: { type: Number, min: 1, max: 5 },
+      comment: { type: String, maxlength: 300 },
+      submittedAt: { type: Date },
+    },
   },
   { timestamps: true }
 );
