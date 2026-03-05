@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { IssueModel } from "../models/issue.model";
+import { CitizenModel } from "../models/citizen.model";
 
 /** GET /api/v1/stats (Public) */
 export const getPublicStats = async (_req: Request, res: Response): Promise<void> => {
@@ -126,6 +127,55 @@ export const exportCsv = async (_req: Request, res: Response): Promise<void> => 
         res.send(csv);
     } catch (error) {
         console.error("Error exporting CSV:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+/** GET /api/v1/leaderboard */
+export const getLeaderboard = async (_req: Request, res: Response): Promise<void> => {
+    try {
+        // Top 10 citizens by reputation
+        const topCitizens = await CitizenModel.find({})
+            .select("fullName reputationPoints")
+            .sort({ reputationPoints: -1 })
+            .limit(10)
+            .lean();
+
+        // For each top citizen, count issues by type to assign badges
+        const leaderboard = await Promise.all(
+            topCitizens.map(async (citizen, index) => {
+                const issueCounts = await IssueModel.aggregate([
+                    { $match: { citizenId: citizen._id } },
+                    { $group: { _id: "$issueType", count: { $sum: 1 } } },
+                ]);
+
+                const badges: string[] = [];
+                const totalIssues = issueCounts.reduce((sum: number, g: any) => sum + g.count, 0);
+
+                for (const g of issueCounts) {
+                    if (g._id === "Roads" && g.count >= 3) badges.push("🛣️ Road Warrior");
+                    if (g._id === "Garbage" && g.count >= 3) badges.push("🌿 Eco Guardian");
+                    if (g._id === "Electricity" && g.count >= 3) badges.push("⚡ Power Sentinel");
+                    if (g._id === "Water" && g.count >= 3) badges.push("💧 Water Watcher");
+                    if (g._id === "Public Safety" && g.count >= 3) badges.push("🛡️ Safety Guardian");
+                }
+                if (totalIssues >= 10) badges.push("🏆 Community Champion");
+                if (totalIssues >= 5 && badges.length === 0) badges.push("⭐ Active Citizen");
+                if (index === 0) badges.push("👑 Top Reporter");
+
+                return {
+                    rank: index + 1,
+                    _id: citizen._id,
+                    fullName: citizen.fullName,
+                    reputationPoints: citizen.reputationPoints,
+                    totalIssues,
+                    badges,
+                };
+            })
+        );
+
+        res.json({ leaderboard });
+    } catch (error) {
+        console.error("Error fetching leaderboard:", error);
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
