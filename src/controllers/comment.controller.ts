@@ -51,19 +51,71 @@ export const addComment = async (req: AuthRequest, res: Response): Promise<void>
             parentId: parentId || null,
         });
 
-        // Notify issue reporter if commenter is someone else
-        if (issue.citizenId.toString() !== authorId) {
+        // ── Smart Notification Logic ──────────────────────────────────────
+        const notifyUser = async (
+            recipientId: string,
+            recipientRole: "citizen" | "admin",
+            message: string
+        ) => {
+            // Don't notify yourself
+            if (recipientId === authorId) return;
             const notification = await NotificationModel.create({
-                recipientId: issue.citizenId,
-                recipientRole: "citizen",
+                recipientId,
+                recipientRole,
                 type: "comment",
-                message: `${authorName} commented on your issue: "${issue.title}"`,
+                message,
                 issueId: issue._id,
             });
+            io.to(`user_${recipientId}`).emit("notification", notification);
+        };
 
-            // Emit socket event
-            io.to(`user_${issue.citizenId.toString()}`).emit("notification", notification);
+        // 1. If replying to a specific comment → notify that comment's author
+        if (parentId) {
+            const parentComment = await CommentModel.findById(parentId).lean();
+            if (parentComment) {
+                await notifyUser(
+                    parentComment.authorId.toString(),
+                    parentComment.authorRole,
+                    `${authorName} replied to your comment on issue: "${issue.title}"`
+                );
+            }
         }
+
+        // 2. If a citizen commented → find all admins who previously commented and notify them
+        if (req.role === "citizen") {
+            const adminCommenters = await CommentModel.find({
+                issueId: id,
+                authorRole: "admin",
+                authorId: { $ne: authorId }, // exclude if somehow citizen is also admin
+            }).distinct("authorId");
+
+            for (const adminId of adminCommenters) {
+                await notifyUser(
+                    adminId.toString(),
+                    "admin",
+                    `${authorName} replied on issue: "${issue.title}"`
+                );
+            }
+
+            // Also notify the issue's citizen owner if it's a different citizen commenting
+            if (issue.citizenId.toString() !== authorId && !parentId) {
+                await notifyUser(
+                    issue.citizenId.toString(),
+                    "citizen",
+                    `${authorName} commented on your issue: "${issue.title}"`
+                );
+            }
+        }
+
+        // 3. If an admin commented → notify the issue reporter (citizen)
+        if (req.role === "admin" && !parentId) {
+            await notifyUser(
+                issue.citizenId.toString(),
+                "citizen",
+                `Admin ${authorName} commented on your issue: "${issue.title}"`
+            );
+        }
+        // ─────────────────────────────────────────────────────────────────
 
         res.status(201).json({ message: "Comment added", comment });
     } catch (error) {
@@ -71,6 +123,7 @@ export const addComment = async (req: AuthRequest, res: Response): Promise<void>
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
+
 
 /** GET /api/v1/issues/:id/comments */
 export const getComments = async (req: Request, res: Response): Promise<void> => {
